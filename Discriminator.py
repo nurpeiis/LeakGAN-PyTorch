@@ -50,17 +50,20 @@ class Discriminator(nn.Module):
         #2. Convolution + maxpool layer for each filter size
         #3. Combine all the pooled features into a prediction
         #4. Add highway
-        #5. Add dropout
+        #5. Add dropout. This is when feature should be extracted
         #6. Final unnormalized scores and predictions
         emb = self.emb(x).unsqueeze(1) #batch_siez, 1*seq_len * emb_dim
         convs = [F.relu(conv(emb)).squeeze(3) for conv in self.convs] #[batch_size * num_filter * seq_len]
         pools = [F.max_pool1d(conv, conv.size(2)).squeeze(2) for conv in convs] #[batch_size * num_filter]
         pred = torch.cat(pools, 1) # batch_size * sum of num_filtes_sum
         highway = self.highway(pred)
-        pred = F.sigmoid(highway)*F.relu(highway) + (1. - transform)*pred # sets C = 1 - T
-        pred = F.logsoftmax(self.fc(self.dropout(pred)), dim=1) #batch * num_classes
-        return pred
+        highway = F.sigmoid(highway)*F.relu(highway) + (1. - transform)*pred # sets C = 1 - T
+        features = self.dropout(highway)
+        score = self.fc(features)
+        pred = F.logsoftmax(score, dim=1) #batch * num_classes
+        return {"pred":pred, "feature":features, "score": score}
 
+#Need to think how to get features if asked by generator's manager during its training process
 """
 For feature extraction somethin like this can be used:
 

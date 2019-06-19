@@ -8,7 +8,7 @@ A simple implementation of LeakGAN in PyTorch described in [Long Text Generation
 * CUDA 7.5+ (For GPU)
 
 
-##File
+## File
 * Discriminator.py: The discriminator model of LeakGAN including Feature Extractor and classification
 * data_iter.py: Data loader for Generator and Discriminator
 * convert.py: Convert one-hot number to real word
