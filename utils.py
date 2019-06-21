@@ -336,4 +336,83 @@ def get_rewards(model_dict, input_x, rollout_num, use_cuda=False, temperature=1.
     discriminator = discriminator.train()
     return rewards
 def rescale(rewards, delta=16.0):
-    ""
+    """
+    Why Rescaled activation: during adversarial training of SeqGAN severe gradient vanishing occurs when D is much stronger than G, i.e. the reward is too small value to update the parameters
+    and thus need to be rescaled before being fed into G.
+        parameters for rewards:
+            type: list
+            length: seq_len / c, where c is c recent goals(steps into future)
+            elements: np.array(size=batch_size)
+            R(reward matrix) = expit(delta * (0.5 - rank(i)/B)), where expit, is an activation function that re-projects the equidifferent scoring based on ranking to a more effective distribution. 
+            In this model authors of the paper decided expit to be sigmoid function: expit = 1/(1+exp(-x))
+    """
+    r = np.array(rewards)
+    _, batch_size = r.shape
+    order = np.argsort(r)
+    rank = np.argsort(order)
+    rank = batch_size - rank
+    rescaled_rewards = expit(delta*(0.5 - rank/batch_size))
+    rescaled_rewards = np.transpose(rescaled_rewards)
+    return Variable(torch.from_numpy(rescaled_rewards)).float()
+
+def one_hot(x, vocab_size, use_cuda=False):
+    batch_size, seq_len = x.size()
+    out = torch.zeros(batch_size * seq_len, vocab_size)
+    if use_cuda:
+        out = out.cuda()
+    x = x.contiguous()
+    x = x.view(-1, 1)
+    out = out.scatter_(1, x.data, 1,0) #setting particular values of a tensor at the provided indices, one hot vector at positions where there is word
+    out = Variable(out)
+    if use_cuda:
+        out = out.cuda(async=True)
+    return out
+
+def loss_func(f_type="pre_worker"):
+    """
+    5 kind of loss function: pre_worker, pre_manager, adv_worker, adv_manager, dis
+    """
+    if f_type == "pre_worker":
+        def func(real_data, prediction, vocab_size, use_cuda=False):
+            prediction = torch.clamp(prediction, 1e-20, 1.0) # put min and max boundaries
+            loss = -torch.mean(one_hot(real_data, vocab_size, use_cuda) * torch.log(prediction))
+            return loss
+        return func
+    elif f_type == "pre_manager":
+        def func(real_goal, delta_feature):
+            loss = -torch.mean(1.0 - F.cosine_similarity(real_goal, delta_feature, dim=2))
+            return loss
+        return func
+    elif f_type == "adv_worker":
+        def func(all_goal, delta_feature_for_worker, gen_token, prediction, vocab_size, use_cuda=False):
+            intrinsic_rewards = 1.0 - F.cosine_similarity(all_goal, delta_feature_for_worker, dim=2)
+            prediction = torch.clamp(prediction, 1e-20, 1.0)
+            loss = -torch.mean(intrinsic_rewards * torch.sum(one_hot(gen_token, vocab_size, use_cuda)* torch.log(prediction), dim=2))
+            return loss
+        return func
+    elif f_type == "adv_manager":
+        def func(rewards, real_goal, delta_feature):
+            loss = -torch.mean(rewards*(1.0 - F.cosine_similarity(delta_feature, real_goal, dim=2)))
+            return loss
+        return func
+    elif f_type == "dis":
+        def func(discriminator, input_x, score, use_cuda=False):
+            """
+            input_x:
+                size(batch_size*seq_len)
+                type(torch.LongTensor)
+            score:
+                size(batch_size * seq_len * vocab_size)
+                type(torch.FloatTensor)
+            """
+            loss_func = nn.CrossEntropyLoss() 
+            if use_cuda:
+                loss_func = loss_func.cuda()
+            input_x = input_x.view(-1) #last dim
+            batch_size, seq_len, vocab_size = score.size()
+            score = score.view(batch_size * seq_len, -1) #reshape
+            loss = loss_func(score, input_x) + discriminator.l2_loss()
+            return loss
+        return func
+    else:
+        raise("Invalid loss function type")
