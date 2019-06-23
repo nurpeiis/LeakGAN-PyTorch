@@ -13,6 +13,8 @@ A simple implementation of LeakGAN in PyTorch described in [Long Text Generation
 * data_iter.py: Data loader for Generator and Discriminator
 * convert.py: Convert one-hot number to real word
 * eval_bleu.py: Evaluation of the BLEU scores (2-5) between test dataset and generated data
+* Generator.py: The generator model of LeakGAN including worker and manager units
+* utils.py: contains all the 
 
 ## Reference
 ```bash
