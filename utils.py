@@ -10,7 +10,7 @@ def init_vars(generator, discriminator, use_cuda=False):
     h_m_t, c_m_t = generator.init_hidden() #manager unit of gen
     last_goal = Variable(torch.zeros(generator.worker.batch_size, generator.worker.goal_out_size)) #bach_size * goal_out_size
     real_goal = generator.manager.goal_init
-    x_t = Variable(nn.init.constant(torch.Tensor(
+    x_t = Variable(nn.init.constant_(torch.Tensor(
         generator.worker.batch_size
     ), discriminator.start_token)).long()
     variables_ = [h_w_t, c_w_t, h_m_t, c_m_t, last_goal, real_goal, x_t]
@@ -275,7 +275,7 @@ def recurrent_func(f_type = "pre"):
             while t < seq_len:
                 #Extract f_t
                 if t == 0:
-                    cur_sen = Variable(nn.init.constant(
+                    cur_sen = Variable(nn.init.constant_(
                         torch.zeros(batch_size, seq_len), vocab_size)
                     ).long()
                     if use_cuda:

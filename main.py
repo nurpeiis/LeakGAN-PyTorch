@@ -111,7 +111,7 @@ def get_arguments():
     }
 #List of models
 def prepare_model_dict(use_cuda=False):
-    f = open("model_params.json")
+    f = open("./params/leak_gan_params.json")
     params = json.load(f)
     f.close()
     discriminator_params = params["discriminator_params"]
@@ -208,6 +208,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
         clip_grad_norm(worker.parameters(), max_norm=max_norm)
         w_optimizer.step()
         w_optimizer.zero_grad()
+        print("Pre-Manager Loss: {.5f}, Pre-Worker Loss: {:.5f}\n".format(m_loss, w_loss))
     """
     Update model_dict, optimizer_dict, and scheduler_dict
     """
@@ -265,6 +266,7 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
             d_lr_scheduler.step()
             loss.backward()
             d_optimizer.step()
+            print("Pre-Discriminator loss: {:.5f}".format(loss))
     
     model_dict["discriminator"] = discriminator
     optimizer_dict["discriminator"] = d_optimizer
@@ -324,6 +326,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         clip_grad_norm(worker.parameters(), max_norm)
         m_optimizer.step()
         w_optimizer.step()
+        print("Adv-Manager loss: {:.5f} Adv-Worker loss: {:.5f}".format(m_loss, w_loss))
     
     del adv_rets
     del real_goal
@@ -339,7 +342,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         generate_samples(model_dict, neg_file, batch_size, use_cuda, temperature)
         dis_dataloader_params["positive_filepath"] = pos_file
         dis_dataloader_params["negative_filepath"] = neg_file
-        dataloader = dis_dataloader(**dis_dataloader_params)
+        dataloader = dis_data_loader(**dis_dataloader_params)
 
         cross_entropy = nn.CrossEntropyLoss()
         if use_cuda:
@@ -364,6 +367,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
                 d_lr_scheduler.step()
                 loss.backward()
                 d_optimizer.step()
+                print("Adv-Discriminator Loss: {:.5f}".format(loss))
     #Save all changes
     model_dict["discriminator"] = discriminator
     generator.worker = worker
@@ -425,8 +429,8 @@ def main():
         dis_data_params["pin_memory"] = True
     pos_file = dis_data_params["positive_filepath"]
     neg_file = dis_data_params["negative_filepath"]
-    batch_size = param_dict["train_params"]["generate_num"]
-    vocab_size = param_dict["leak_gan_params"]["discriminator"]["vocab_size"]
+    batch_size = param_dict["train_params"]["generated_num"]
+    vocab_size = param_dict["leak_gan_params"]["discriminator_params"]["vocab_size"]
     for _ in range(param_dict["train_params"]["pre_dis_epoch_num"]):
         model_dict, optimizer_dict, scheduler_dict = pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict, dis_data_params, vocab_size=vocab_size, positive_file=pos_file, negative_file=neg_file, batch_size=batch_size, epochs=1, use_cuda=use_cuda)
     #Pretrain generator 

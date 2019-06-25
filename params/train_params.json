@@ -1,0 +1,17 @@
+{
+    "lr_dict":{"worker":0.0015,"manager":0.0015,"discriminator":5e-5},
+    "decay_step_size":200,
+    "decay_rate":0.99,
+    "total_epoch":800,
+    "generated_num":156,
+    "save_num":10,
+    "replace_num":5,
+    "pre_dis_epoch_num":50,
+    "pre_gen_epoch_num":80,
+    "pos_filepath":"./data/train_corpus.npy",
+    "neg_filepath":"./data/gen_data.npy",
+    "eval_filepath":"./data/eval_data.npy",
+    "model_path":"./ckpts/",
+    "seed":233,
+    "checkpoint_path":null
+}

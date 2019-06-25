@@ -32,23 +32,22 @@ class Manager(nn.Module):
         self.goal_init = nn.Parameter(torch.zeros(self.batch_size, self.goal_out_size))
         self._init_params()
 
-        def _init_params(self):
-            for param in self.parameters():
-                nn.init.normal(param, std=0.1)
-            self.goal_init.data = truncated_normal(
-                self.goal_init.data.shape
-            )
-        def forward(self, f_t, h_m_t, c_m_t):
-            """
-            f_t = feature of CNN from discriminator leaked at time t, it is input into LSTM
-            h_m_t = ouput of previous LSTMCell
-            c_m_t = previous cell state
-            """
-            h_m_tp1, c_m_tp1 = self.recurrent_unit(f_t, (h_m_t, c_m_t))
-            sub_goal = self.fc(h_m_tp1)
-            sub_goal = torch.renorm(sub_goal, 2, 0, 1.0) #Returns a tensor where each sub-tensor of input along dimension dim is normalized such that the p-norm of the sub-tensor is lower than the value maxnorm
-            return sub_goal, h_m_tp1, c_m_tp1
-
+    def _init_params(self):
+        for param in self.parameters():
+            nn.init.normal_(param, std=0.1)
+        self.goal_init.data = truncated_normal(
+            self.goal_init.data.shape
+        )
+    def forward(self, f_t, h_m_t, c_m_t):
+        """
+        f_t = feature of CNN from discriminator leaked at time t, it is input into LSTM
+        h_m_t = ouput of previous LSTMCell
+        c_m_t = previous cell state
+        """
+        h_m_tp1, c_m_tp1 = self.recurrent_unit(f_t, (h_m_t, c_m_t))
+        sub_goal = self.fc(h_m_tp1)
+        sub_goal = torch.renorm(sub_goal, 2, 0, 1.0) #Returns a tensor where each sub-tensor of input along dimension dim is normalized such that the p-norm of the sub-tensor is lower than the value maxnorm
+        return sub_goal, h_m_tp1, c_m_tp1
 class Worker(nn.Module):
     def __init__(self, batch_size, vocab_size, embed_dim, hidden_dim, 
                     goal_out_size, goal_size):
@@ -66,21 +65,20 @@ class Worker(nn.Module):
         self.goal_change = nn.Parameter(torch.zeros(self.goal_out_size, self.goal_size))
         self._init_params()
         
-        def _init_params(self):
-            for param in self.parameters():
-                nn.init.normal(param, std=0.1)
-
-        def forward(self, x_t, h_w_t, c_w_t):
-            """
-                x_t = last word
-                h_w_t = last output of LSTM in Worker
-                c_w_t = last cell state of LSTM in Worker
-            """
-            x_t_emb = self.emb(x_t)
-            h_w_tp1, c_w_tp1 = self.recurrent_unit(x_t_emb, (h_w_t, c_w_t))
-            output_tp1 = self.fc(h_w_tp1)
-            output_tp1 = output_tp1.view(self.batch_size, self.vocab_size, self.goal_size)
-            return output_tp1, h_w_tp1, c_w_tp1
+    def _init_params(self):
+        for param in self.parameters():
+            nn.init.normal_(param, std=0.1)
+    def forward(self, x_t, h_w_t, c_w_t):
+        """
+            x_t = last word
+            h_w_t = last output of LSTM in Worker
+            c_w_t = last cell state of LSTM in Worker
+        """
+        x_t_emb = self.emb(x_t)
+        h_w_tp1, c_w_tp1 = self.recurrent_unit(x_t_emb, (h_w_t, c_w_t))
+        output_tp1 = self.fc(h_w_tp1)
+        output_tp1 = output_tp1.view(self.batch_size, self.vocab_size, self.goal_size)
+        return output_tp1, h_w_tp1, c_w_tp1
 class Generator(nn.Module):
     def __init__(self, worker_params, manager_params, step_size):
         super(Generator, self).__init__()

@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.utils.data import Dataset, Dataloader
+from torch.utils.data import Dataset, DataLoader
 
 class Real_Dataset(Dataset):
     def __init__(self, filepath):
@@ -32,8 +32,8 @@ class Dis_Dataset(Dataset):
 
 def real_data_loader(filepath, batch_size, shuffle, num_workers, pin_memory):
     dataset = Real_Dataset(filepath)
-    return Dataloader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
+    return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
 def dis_data_loader(pos_filepath, neg_filepath, batch_size, shuffle, num_workers, pin_memory):
     dataset = Dis_Dataset(pos_filepath, neg_filepath)
-    return Dataloader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
+    return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
