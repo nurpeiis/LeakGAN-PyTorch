@@ -424,9 +424,11 @@ def main():
     #Pretrain discriminator
     print ("#########################################################################")
     print ("Start Pretraining Discriminator...")
-    dis_data_params = param_dict["dis_data_params"]
+    with open("./params/dis_data_params.json", 'r') as f:
+        dis_data_params = json.load(f)
     if use_cuda:
         dis_data_params["pin_memory"] = True
+    f.close()
     pos_file = dis_data_params["positive_filepath"]
     neg_file = dis_data_params["negative_filepath"]
     batch_size = param_dict["train_params"]["generated_num"]
