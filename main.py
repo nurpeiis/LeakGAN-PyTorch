@@ -16,7 +16,7 @@ from data_iter import real_data_loader, dis_data_loader
 from utils import recurrent_func, loss_func, get_sample, get_rewards
 from Discriminator import Discriminator
 from Generator import Generator
-
+from target_lstm import TargetLSTM
 
 #Arguments
 parser = argparse.ArgumentParser(description="LeakGAN")

@@ -61,7 +61,7 @@ def recurrent_func(f_type = "pre"):
             while t < seq_len + 1:
                 #Extract Feature from D
                 if t == 0:
-                    cur_sen = Variable(nn.init.constant(
+                    cur_sen = Variable(nn.init.constant_(
                         torch.zeros(batch_size, seq_len), vocab_size
                     )).long()
                 else:
@@ -141,7 +141,7 @@ def recurrent_func(f_type = "pre"):
             while t < seq_len + 1:
                 #Extract Feature from D
                 if t == 0:
-                    cur_sen = Variable(nn.init.constant(
+                    cur_sen = Variable(nn.init.constant_(
                         torch.zeros(batch_size, seq_len), vocab_size
                     )).long()
                 else:
@@ -212,7 +212,7 @@ def recurrent_func(f_type = "pre"):
             while t < given_num +1:
                 #Extract f_t
                 if t == 0: 
-                    cur_sen = Variable(nn.init.constant(torch.zeros(batch_size, seq_len), vocab_size)).long()
+                    cur_sen = Variable(nn.init.constant_(torch.zeros(batch_size, seq_len), vocab_size)).long()
                     if use_cuda:
                         cur_sen = cur_sen.cuda(async=True)
                 else:
@@ -236,7 +236,7 @@ def recurrent_func(f_type = "pre"):
                 while t < seq_len + 1:
                     #Extract feature f_t
                     if len(gen_token_list) == 0:
-                        cur_sen = Variable(nn.init.constant(torch.zeros(batch_size, seq_len), vocab_size)).long()
+                        cur_sen = Variable(nn.init.constant_(torch.zeros(batch_size, seq_len), vocab_size)).long()
                         if use_cuda:
                             cur_sen = cur_sen.cuda(async=True)
                     else:
