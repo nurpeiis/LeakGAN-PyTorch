@@ -44,6 +44,9 @@ class Manager(nn.Module):
         h_m_t = ouput of previous LSTMCell
         c_m_t = previous cell state
         """
+        #print("H_M size: {}".format(h_m_t.size()))
+        #print("C_M size: {}".format(c_m_t.size()))
+        #print("F_t size: {}".format(f_t.size()))
         h_m_tp1, c_m_tp1 = self.recurrent_unit(f_t, (h_m_t, c_m_t))
         sub_goal = self.fc(h_m_tp1)
         sub_goal = torch.renorm(sub_goal, 2, 0, 1.0) #Returns a tensor where each sub-tensor of input along dimension dim is normalized such that the p-norm of the sub-tensor is lower than the value maxnorm

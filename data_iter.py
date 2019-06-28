@@ -26,7 +26,7 @@ class Dis_Dataset(Dataset):
     
     def __getitem__(self, idx):
         data = torch.from_numpy(self.data[idx]).long()
-        label = torch.nn.init.constant(torch.zeros(1), int(self.label[idx])).long()
+        label = torch.nn.init.constant_(torch.zeros(1), int(self.label[idx])).long()
         return {"data": data, "label": label}
 
 
@@ -34,6 +34,6 @@ def real_data_loader(filepath, batch_size, shuffle, num_workers, pin_memory):
     dataset = Real_Dataset(filepath)
     return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)
 
-def dis_data_loader(pos_filepath, neg_filepath, batch_size, shuffle, num_workers, pin_memory):
-    dataset = Dis_Dataset(pos_filepath, neg_filepath)
+def dis_data_loader(positive_filepath, negative_filepath, batch_size, shuffle, num_workers, pin_memory):
+    dataset = Dis_Dataset(positive_filepath, negative_filepath)
     return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=pin_memory)

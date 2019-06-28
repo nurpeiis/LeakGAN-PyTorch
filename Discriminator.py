@@ -23,7 +23,7 @@ class Highway(nn.Module):
     def forward(self, x):
         #highway = F.sigmoid(highway)*F.relu(highway) + (1. - transform)*pred # sets C = 1 - T
         g = F.relu(self.fc1)
-        t = F.sigmoid(self.fc2)
+        t = torch.sigmoid(self.fc2)
         out = g*t + (1. - t)*x
         return out
 class Discriminator(nn.Module):
@@ -85,7 +85,7 @@ class Discriminator(nn.Module):
         pooled_out = [F.max_pool1d(conv, conv.size(2)).squeeze(2) for conv in convs] # [batch_size * num_filter]
         pred = torch.cat(pooled_out, 1) # batch_size * sum(num_filters)
         highway = self.highway(pred)
-        highway = F.sigmoid(highway)* F.relu(highway) + (1.0 - F.sigmoid(highway))*pred
+        highway = torch.sigmoid(highway)* F.relu(highway) + (1.0 - torch.sigmoid(highway))*pred
         features = self.dropout(highway)
         score = self.fc(features)
         pred = F.log_softmax(score, dim=1) #batch * num_classes

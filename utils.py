@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 def init_vars(generator, discriminator, use_cuda=False):
     h_w_t, c_w_t = generator.init_hidden() #worker unit of gen
     h_m_t, c_m_t = generator.init_hidden() #manager unit of gen
@@ -37,7 +38,7 @@ def recurrent_func(f_type = "pre"):
             """
                 Get generator and discriminator
             """
-            
+            print("After sample size: {}".format(real_data.size()))
             generator = model_dict["generator"]
             discriminator = model_dict["discriminator"]
             '''
@@ -64,13 +65,21 @@ def recurrent_func(f_type = "pre"):
                     cur_sen = Variable(nn.init.constant_(
                         torch.zeros(batch_size, seq_len), vocab_size
                     )).long()
+                    #print("Batch Size: {}".format(batch_size))
+                    #print("Real Data: {}".format(cur_sen.size()))
                 else:
                     cur_sen = real_data[:,:t]
+                    #print("Real Data: {}".format(real_data.size()))
+                    #print("t: {}".format(t))
                     cur_sen = cur_sen.contiguous()
                     cur_sen = F.pad(cur_sen.view(-1, t), (0, seq_len - t), value=vocab_size)
                 if use_cuda:
                     cur_sen = cur_sen.cuda(async=True)
+                #print("Current sentence:{}".format(cur_sen))
+                #print("Current sentence size:{}".format(cur_sen.size()))
                 f_t= discriminator(cur_sen)["feature"]
+                #print("F_t from discr: {}".format(f_t))
+                #print("F_t from discr: {}".format(f_t.size()))
                 #G forward tep
                 x_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal,\
                 sub_goal, probs, t_ = generator(
@@ -100,6 +109,7 @@ def recurrent_func(f_type = "pre"):
                 real_goal_list = real_goal_list[:-1] #exclude the last element
             prediction_list = prediction_list[:-1]
             real_goal_var = torch.stack(real_goal_list).permute(1,0,2)#stack = turn a list of PyTorch Tensors into one tensor, permute = rotating in regards to z axis
+            #print("Prediction stack before stacking: {}".format(torch.stack(prediction_list).size()))
             prediction_var = torch.stack(prediction_list).permute(1,0,2)
             delta_feature_var = torch.stack(delta_feature_list).permute(1,0,2)
             """
@@ -357,13 +367,30 @@ def rescale(rewards, delta=16.0):
 
 def one_hot(x, vocab_size, use_cuda=False):
     batch_size, seq_len = x.size()
-    out = torch.zeros(batch_size * seq_len, vocab_size)
-    if use_cuda:
-        out = out.cuda()
+    print(x.device)
+    out = torch.zeros(batch_size* seq_len, vocab_size, device=x.device)
+    print(out.size())
     x = x.contiguous()
     x = x.view(-1, 1)
-    out = out.scatter_(1, x.data, 1,0) #setting particular values of a tensor at the provided indices, one hot vector at positions where there is word
+    #print("X size: {}".format(x.size()))
+    #print("Out size: {}".format(out.size()))
+    #print("Out size at dim 1: {}".format(out.size(1)))
+    if (x.data < vocab_size).all() == 0:
+        for i, d in enumerate(x.data):
+            if x[i].item() > vocab_size - 1 :
+                x[i] = 0
+                #print(x[i])
+                #print (i)
+    out = out.scatter_(1, x.data, 1.0) #setting particular values of a tensor at the provided indices, one hot vector at positions where there is word
+    """
+        check places with 1.0 in out
+        a = (out == 1.0).nonzero()
+        print(a)
+    """
+
+    out = out.view(batch_size, seq_len, vocab_size)
     out = Variable(out)
+    
     if use_cuda:
         out = out.cuda(async=True)
     return out
@@ -374,13 +401,20 @@ def loss_func(f_type="pre_worker"):
     """
     if f_type == "pre_worker":
         def func(real_data, prediction, vocab_size, use_cuda=False):
+            #print("Prediction shape before: {}".format(prediction.size()))
             prediction = torch.clamp(prediction, 1e-20, 1.0) # put min and max boundaries
+            #print("One Hot: {}".format(one_hot(real_data, vocab_size, use_cuda).size()))
+            print("Real data size: {}".format(real_data.size()))
+            #print("Log Prediction: {}".format(torch.log(prediction).size()))
+            hot_one = one_hot(real_data, vocab_size, use_cuda)
+            #print("Pred after reshape: {}".format(prediction.size()))
+            #print("One Hot after reshape: {}".format(hot_one.size()))
             loss = -torch.mean(one_hot(real_data, vocab_size, use_cuda) * torch.log(prediction))
             return loss
         return func
     elif f_type == "pre_manager":
         def func(real_goal, delta_feature):
-            loss = -torch.mean(1.0 - F.cosine_similarity(real_goal, delta_feature, dim=2))
+            loss = -torch.mean(1.0 - F.cosine_similarity(real_goal, delta_feature))
             return loss
         return func
     elif f_type == "adv_worker":

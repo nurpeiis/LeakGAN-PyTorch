@@ -4,13 +4,14 @@ import numpy as np
 import json 
 import glob
 import os #for checkpoint management
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
 from torch.autograd import Variable
-from torch.nn.utils import clip_grad_norm
+from torch.nn.utils import clip_grad_norm_
 
 from data_iter import real_data_loader, dis_data_loader
 from utils import recurrent_func, loss_func, get_sample, get_rewards
@@ -166,11 +167,11 @@ def prepare_scheduler_dict(optmizer_dict, step_size=200, gamma=0.99):
             "discriminator": d_scheduler}
 
 #Pretraining the Generator
-def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, vocab_size, max_norm=5.0, use_cuda=False):
+def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, vocab_size, max_norm=5.0, use_cuda=False, epoch=1, tot_epochs=100):
     #get the models of generator
     generator = model_dict["generator"]
     worker = generator.worker
-    manager = generator.worker
+    manager = generator.manager
     #get the optimizers
     m_optimizer = optimizer_dict["manager"]
     w_optimizer = optimizer_dict["worker"]
@@ -183,32 +184,37 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
     """
      Perform pretrain step for real data
     """
+    
     for i, sample in enumerate(dataloader):
+        print("DataLoader: {}".format(dataloader))
         m_lr_scheduler.step()
         w_lr_scheduler.step()
 
         sample = Variable(sample)
         if use_cuda:
-            sample = sample.cuda(asyn=True)
+            sample = sample.cuda(async=True)
         
         # Calculate pretrain loss
-        pre_rets = recurrent_func("pre")(model_dict, sample, use_cuda)
-        real_goal = pre_rets["real_goal"]
-        prediction = pre_rets["prediction"]
-        delta_feature = pre_rets["delta_feature"]
+        if (sample.size() == torch.zeros([64, 20]).size()): #sometimes smaller than 64 (16) is passed, so this if statement disables it
+            #print("Sample size: {}".format(sample.size()))
+            pre_rets = recurrent_func("pre")(model_dict, sample, use_cuda)
+            real_goal = pre_rets["real_goal"]
+            prediction = pre_rets["prediction"]
+            delta_feature = pre_rets["delta_feature"]
 
-        m_loss = loss_func("pre_manager")(real_goal, delta_feature)
-        torch.autograd.grad(m_loss, manager.parameters())
-        clip_grad_norm(manager.parameters(), max_norm=max_norm)
-        m_optimizer.step()
-        m_optimizer.zero_grad()
-
-        w_loss = loss_func("pre_worker")(sample, prediction, vocab_size, use_cuda)
-        torch.autograd.grad(w_loss, worker.parameters())
-        clip_grad_norm(worker.parameters(), max_norm=max_norm)
-        w_optimizer.step()
-        w_optimizer.zero_grad()
-        print("Pre-Manager Loss: {.5f}, Pre-Worker Loss: {:.5f}\n".format(m_loss, w_loss))
+            m_loss = loss_func("pre_manager")(real_goal, delta_feature)
+            torch.autograd.grad(m_loss, manager.parameters())
+            clip_grad_norm_(manager.parameters(), max_norm=max_norm)
+            m_optimizer.step()
+            m_optimizer.zero_grad()
+            
+            w_loss = loss_func("pre_worker")(sample, prediction, vocab_size, use_cuda)
+            torch.autograd.grad(w_loss, worker.parameters())
+            clip_grad_norm_(worker.parameters(), max_norm=max_norm)
+            w_optimizer.step()
+            w_optimizer.zero_grad()
+        if epoch % 5 == 0:
+           print("Epoch: {}/{} Pre-Manager Loss: {:.5f}, Pre-Worker Loss: {:.5f}\n".format(epoch,tot_epochs, m_loss, w_loss))
     """
     Update model_dict, optimizer_dict, and scheduler_dict
     """
@@ -246,14 +252,15 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
     generate_samples(model_dict, negative_file, batch_size, use_cuda, temperature)
     dis_dataloader_params["positive_filepath"] = positive_file
     dis_dataloader_params["negative_filepath"] = negative_file
-    dataloader = dis_dataloader_params(**dis_dataloader_params) #this is where data iterator is used
+    #print(dis_dataloader_params)
+    dataloader = dis_data_loader(**dis_dataloader_params) #this is where data iterator is used
 
     cross_entropy = nn.CrossEntropyLoss() #this one is similar to NLL (negative log likelihood)
     if use_cuda:
         cross_entropy = cross_entropy.cuda()
     
     for epoch in range(epochs):
-        for _, sample in enumerate(dataloader):
+        for i, sample in enumerate(dataloader):
             d_optimizer.zero_grad()
             data, label = sample["data"], sample["label"] #initialize sample variables
             data = Variable(data)
@@ -266,7 +273,8 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
             d_lr_scheduler.step()
             loss.backward()
             d_optimizer.step()
-            print("Pre-Discriminator loss: {:.5f}".format(loss))
+            if i == 63:
+                print("Pre-Discriminator loss: {:.5f}".format(loss))
     
     model_dict["discriminator"] = discriminator
     optimizer_dict["discriminator"] = d_optimizer
@@ -277,7 +285,7 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
 def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader_params,
                       vocab_size, pos_file, neg_file, batch_size, gen_train_num=1,
                       dis_train_epoch=5, dis_train_num=3, max_norm=5.0,
-                      rollout_num=4, use_cuda=False, temperature=1.0):
+                      rollout_num=4, use_cuda=False, temperature=1.0, epoch=1, tot_epoch=100):
     """
         Get all the models, optimizer and schedulers
     """                     
@@ -322,11 +330,12 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
 
         torch.autograd.grad(m_loss, manager.parameters()) #based on loss improve the parameters
         torch.autograd.grad(w_loss, worker.parameters())
-        clip_grad_norm(manager.parameters(), max_norm)
-        clip_grad_norm(worker.parameters(), max_norm)
+        clip_grad_norm_(manager.parameters(), max_norm)
+        clip_grad_norm_(worker.parameters(), max_norm)
         m_optimizer.step()
         w_optimizer.step()
-        print("Adv-Manager loss: {:.5f} Adv-Worker loss: {:.5f}".format(m_loss, w_loss))
+        if epoch % 5 == 0:
+            print("Epoch: {}/{} Adv-Manager loss: {:.5f} Adv-Worker loss: {:.5f}".format(epoch, tot_epoch, m_loss, w_loss))
     
     del adv_rets
     del real_goal
@@ -367,7 +376,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
                 d_lr_scheduler.step()
                 loss.backward()
                 d_optimizer.step()
-                print("Adv-Discriminator Loss: {:.5f}".format(loss))
+                print("Epoch: {}/{} Adv-Discriminator Loss: {:.5f}".format(epoch, tot_epoch, loss))
     #Save all changes
     model_dict["discriminator"] = discriminator
     generator.worker = worker
@@ -433,19 +442,25 @@ def main():
     neg_file = dis_data_params["negative_filepath"]
     batch_size = param_dict["train_params"]["generated_num"]
     vocab_size = param_dict["leak_gan_params"]["discriminator_params"]["vocab_size"]
-    for _ in range(param_dict["train_params"]["pre_dis_epoch_num"]):
+    for i in range(param_dict["train_params"]["pre_dis_epoch_num"]):
+        print("Epoch: {}/{}  Pre-Discriminator".format(i, param_dict["train_params"]["pre_dis_epoch_num"]))
         model_dict, optimizer_dict, scheduler_dict = pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict, dis_data_params, vocab_size=vocab_size, positive_file=pos_file, negative_file=neg_file, batch_size=batch_size, epochs=1, use_cuda=use_cuda)
+    ckpt_num = 0
+    save_checkpoint(model_dict, optimizer_dict, scheduler_dict, ckpt_num)
+
     #Pretrain generator 
+
+
     print ("#########################################################################")
     print ("Start Pretraining Generator...")
     real_data_params = param_dict["real_data_params"]
     if use_cuda:
         real_data_params["pin_memory"] = True
     r_dataloader = real_data_loader(**real_data_params)
-    for _ in range(param_dict["train_params"]["pre_gen_epoch_num"]):
-        model_dict, optimizer_dict, scheduler_dict = pretrain_generator(model_dict, optimizer_dict, scheduler_dict, r_dataloader, vocab_size=vocab_size, use_cuda=use_cuda)
+    for epoch in range(param_dict["train_params"]["pre_gen_epoch_num"]):
+        model_dict, optimizer_dict, scheduler_dict = pretrain_generator(model_dict, optimizer_dict, scheduler_dict, r_dataloader, vocab_size=vocab_size, use_cuda=use_cuda, epoch=epoch, tot_epochs=range(param_dict["train_params"]["pre_gen_epoch_num"]))
     #Finish pretrain and save the checkpoint
-    ckpt_num = 0
+    ckpt_num = 1
     save_checkpoint(model_dict, optimizer_dict, scheduler_dict, ckpt_num)
 
     #Adversarial train of D and G
@@ -455,7 +470,7 @@ def main():
     replace_num = param_dict["train_params"]["replace_num"]
 
     for epoch in range(param_dict["train_params"]["total_epoch"]):
-        model_dict, optimizer_dict, scheduler_dict = adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_data_params, vocab_size=vocab_size, pos_file=pos_file, neg_file=neg_file, batch_size=batch_size, use_cuda=use_cuda)
+        model_dict, optimizer_dict, scheduler_dict = adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_data_params, vocab_size=vocab_size, pos_file=pos_file, neg_file=neg_file, batch_size=batch_size, use_cuda=use_cuda, epoch=epoch, tot_epoch=param_dict["train_params"]["total_epoch"])
         if (epoch + 1) % save_num == 0:
             ckpt_num += 1
             if ckpt_num % replace_num == 0:
