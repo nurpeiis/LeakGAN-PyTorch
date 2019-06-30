@@ -186,7 +186,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
     """
     
     for i, sample in enumerate(dataloader):
-        print("DataLoader: {}".format(dataloader))
+        #print("DataLoader: {}".format(dataloader))
         m_lr_scheduler.step()
         w_lr_scheduler.step()
 
@@ -213,8 +213,8 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
             clip_grad_norm_(worker.parameters(), max_norm=max_norm)
             w_optimizer.step()
             w_optimizer.zero_grad()
-        if epoch % 5 == 0:
-           print("Epoch: {}/{} Pre-Manager Loss: {:.5f}, Pre-Worker Loss: {:.5f}\n".format(epoch,tot_epochs, m_loss, w_loss))
+            if i == 63:
+                print("Pre-Manager Loss: {:.5f}, Pre-Worker Loss: {:.5f}\n".format(m_loss, w_loss))
     """
     Update model_dict, optimizer_dict, and scheduler_dict
     """
@@ -307,7 +307,6 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
     d_lr_scheduler = scheduler_dict["discriminator"]
 
     #Adversarial training for generator
-
     for _ in range(gen_train_num):
         m_lr_scheduler.step()
         w_lr_scheduler.step()
@@ -334,8 +333,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         clip_grad_norm_(worker.parameters(), max_norm)
         m_optimizer.step()
         w_optimizer.step()
-        if epoch % 5 == 0:
-            print("Epoch: {}/{} Adv-Manager loss: {:.5f} Adv-Worker loss: {:.5f}".format(epoch, tot_epoch, m_loss, w_loss))
+        print("Adv-Manager loss: {:.5f} Adv-Worker loss: {:.5f}".format(m_loss, w_loss))
     
     del adv_rets
     del real_goal
@@ -347,7 +345,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
     del rewards
 
     #Adversarial training for discriminator
-    for _ in range(dis_train_epoch):
+    for n in range(dis_train_epoch):
         generate_samples(model_dict, neg_file, batch_size, use_cuda, temperature)
         dis_dataloader_params["positive_filepath"] = pos_file
         dis_dataloader_params["negative_filepath"] = neg_file
@@ -376,7 +374,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
                 d_lr_scheduler.step()
                 loss.backward()
                 d_optimizer.step()
-                print("Epoch: {}/{} Adv-Discriminator Loss: {:.5f}".format(epoch, tot_epoch, loss))
+        print("{}/{} Adv-Discriminator Loss: {:.5f}".format(n, range(dis_train_epoch),loss))
     #Save all changes
     model_dict["discriminator"] = discriminator
     generator.worker = worker
@@ -449,8 +447,6 @@ def main():
     save_checkpoint(model_dict, optimizer_dict, scheduler_dict, ckpt_num)
 
     #Pretrain generator 
-
-
     print ("#########################################################################")
     print ("Start Pretraining Generator...")
     real_data_params = param_dict["real_data_params"]
@@ -458,18 +454,23 @@ def main():
         real_data_params["pin_memory"] = True
     r_dataloader = real_data_loader(**real_data_params)
     for epoch in range(param_dict["train_params"]["pre_gen_epoch_num"]):
+        print("Epoch: {}/{}  Pre-Generator".format(epoch, param_dict["train_params"]["pre_gen_epoch_num"]))
         model_dict, optimizer_dict, scheduler_dict = pretrain_generator(model_dict, optimizer_dict, scheduler_dict, r_dataloader, vocab_size=vocab_size, use_cuda=use_cuda, epoch=epoch, tot_epochs=range(param_dict["train_params"]["pre_gen_epoch_num"]))
     #Finish pretrain and save the checkpoint
-    ckpt_num = 1
     save_checkpoint(model_dict, optimizer_dict, scheduler_dict, ckpt_num)
+    
+    ckpt_num = 1
+    
 
     #Adversarial train of D and G
     print ("#########################################################################")
     print ("Start Adversarial Training...")
+    vocab_size = param_dict["leak_gan_params"]["discriminator_params"]["vocab_size"]
     save_num = param_dict["train_params"]["save_num"] #save checkpoint after this number of repetitions
     replace_num = param_dict["train_params"]["replace_num"]
 
     for epoch in range(param_dict["train_params"]["total_epoch"]):
+        print("Epoch: {}/{}  Adv".format(epoch, param_dict["train_params"]["total_epoch"]))
         model_dict, optimizer_dict, scheduler_dict = adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_data_params, vocab_size=vocab_size, pos_file=pos_file, neg_file=neg_file, batch_size=batch_size, use_cuda=use_cuda, epoch=epoch, tot_epoch=param_dict["train_params"]["total_epoch"])
         if (epoch + 1) % save_num == 0:
             ckpt_num += 1
