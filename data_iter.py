@@ -14,8 +14,10 @@ class Real_Dataset(Dataset):
 
 class Dis_Dataset(Dataset):
     def __init__(self, positive_filepath, negative_filepath):
-        pos_data = np.load(positive_filepath)
-        neg_data = np.load(negative_filepath)
+        pos_data = np.load(positive_filepath, allow_pickle=True)
+        neg_data = np.load(negative_filepath, allow_pickle=True)
+        #print("Pos data: {}".format(len(pos_data)))
+        #print("Neg data: {}".format(len(neg_data)))
         pos_label = np.array([1 for _ in pos_data])
         neg_label = np.array([0 for _ in neg_data])
         self.data = np.concatenate([pos_data, neg_data])
