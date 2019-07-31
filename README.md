@@ -30,4 +30,5 @@ A simple implementation of LeakGAN in PyTorch described in [Long Text Generation
 Main source:
 1. https://github.com/CR-Gjx/LeakGAN/blob/master/Image%20COCO/
 2. https://github.com/deep-art-project/Music/blob/master/leak_gan/
+
 Copyright (c) 2019 Nurpeiis Baimukan

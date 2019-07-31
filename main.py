@@ -440,7 +440,6 @@ def main():
     neg_file = dis_data_params["negative_filepath"]
     batch_size = param_dict["train_params"]["generated_num"]
     vocab_size = param_dict["leak_gan_params"]["discriminator_params"]["vocab_size"]
-    c
     for i in range(param_dict["train_params"]["pre_dis_epoch_num"]):
         print("Epoch: {}/{}  Pre-Discriminator".format(i, param_dict["train_params"]["pre_dis_epoch_num"]))
         model_dict, optimizer_dict, scheduler_dict = pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict, dis_data_params, vocab_size=vocab_size, positive_file=pos_file, negative_file=neg_file, batch_size=batch_size, epochs=1, use_cuda=use_cuda)
