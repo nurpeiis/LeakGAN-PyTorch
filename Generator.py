@@ -1,9 +1,9 @@
 from scipy.stats import truncnorm
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
-from torch.distributions import Categorical
+
 
 #A truncated distribution has its domain (the x-values) restricted to a certain range of values. For example, you might restrict your x-values to between 0 and 100, written in math terminology as {0 > x > 100}. There are several types of truncated distributions:
 def truncated_normal(shape, lower=-0.2, upper=0.2):
@@ -83,28 +83,57 @@ class Worker(nn.Module):
         output_tp1 = output_tp1.view(self.batch_size, self.vocab_size, self.goal_size)
         return output_tp1, h_w_tp1, c_w_tp1
 class Generator(nn.Module):
-    def __init__(self, worker_params, manager_params, step_size):
+    def __init__(self, worker_params, manager_params, step_size, gpu = False):
         super(Generator, self).__init__()
         self.step_size = step_size
         self.worker = Worker(**worker_params)
         self.manager = Manager(**manager_params)
+        self.temperature = 1.5
 
-    def init_hidden(self):
-        h = Variable(torch.zeros(self.worker.batch_size, self.worker.hidden_dim))
-        c = Variable(torch.zeros(self.worker.batch_size, self.worker.hidden_dim))
-        return h, c
+    def forward(self, index, input, w_h, m_h, feature, real_goal, no_log=False, train=False):
+        """
+            Pass a token at one time
+            - index : index of a current token in the sentence
+            - input : [batch_size]
+            - w_h (worker hidden layer) : 1 * batch_size * hidden_dim
+            - m_h (manager hidden layers) : 1 * batch_size * hidden_dim
+            - feature (feature of Discriminator based on the current sentence) : 1 * batch_size * total_num_filters
+            - real_goal : batch_size * goal_out_size
+            - no_log : if true then logarithmic soft_max
+            - train : true if training mode
+        """
+        emb = self.embeddings(input).unsqueeze(0)  # 1 * batch_size * embed_dim
 
-    def forward(self, x_t, f_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, t, temperature):
-        sub_goal, h_m_tp1, c_m_tp1 = self.manager(f_t, h_m_t, c_m_t)
-        output, h_w_tp1, c_w_tp1 = self.worker(x_t, h_w_t, c_w_t)
-        last_goal_temp = last_goal + sub_goal
-        w_t = torch.matmul(
-            real_goal, self.worker.goal_change
-        )
-        w_t = torch.renorm(w_t, 2, 0, 1.0)
-        w_t = torch.unsqueeze(w_t, -1)
-        logits = torch.squeeze(torch.matmul(output, w_t))
-        probs = F.softmax(temperature * logits, dim=1)
-        x_tp1 = Categorical(probs).sample()
-        return x_tp1, h_m_tp1, c_m_tp1, h_w_tp1, c_w_tp1,\
-                last_goal_temp, real_goal, sub_goal, probs, t + 1
+        # Manager
+        mana_out, mana_hidden = self.manager(feature, m_h)  # mana_out: 1 * batch_size * hidden_dim
+        mana_out = self.mana2goal(mana_out.permute([1, 0, 2]))  # batch_size * 1 * goal_out_size
+        cur_goal = F.normalize(mana_out, dim=-1)
+        _real_goal = self.goal2goal(real_goal)  # batch_size * goal_size
+        _real_goal = F.normalize(_real_goal, p=2, dim=-1).unsqueeze(-1)  # batch_size * goal_size * 1
+
+        # Worker
+        work_out, work_hidden = self.worker(emb, w_h)  # work_out: 1 * batch_size * hidden_dim
+        work_out = self.work2goal(work_out).view(-1, self.vocab_size,
+                                                 self.goal_size)  # batch_size * vocab_size * goal_size
+
+        # Sample token
+        out = torch.matmul(work_out, _real_goal).squeeze(-1)  # batch_size * vocab_size
+
+        # Temperature control
+        if index > 1:
+            if train:
+                temperature = 1.0
+            else:
+                temperature = self.temperature
+        else:
+            temperature = self.temperature
+
+        out = temperature * out
+
+        if no_log:
+            out = F.softmax(out, dim=-1)
+        else:
+            out = F.log_softmax(out, dim=-1)
+
+        return out, cur_goal, work_hidden, mana_hidden
+        
