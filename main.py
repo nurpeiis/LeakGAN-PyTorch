@@ -192,7 +192,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
 
         sample = Variable(sample)
         if use_cuda:
-            sample = sample.cuda(async=True)
+            sample = sample.cuda(non_blocking=True)
 
         # Calculate pretrain loss
         if (sample.size() == torch.zeros([64, 20]).size()): #sometimes smaller than 64 (16) is passed, so this if statement disables it
@@ -366,8 +366,8 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
                 data = Variable(data)
                 label = Variable(label)
                 if use_cuda:
-                    data = data.cuda(async=True)
-                    label = label.cuda(async=True)
+                    data = data.cuda(non_blocking=True)
+                    label = label.cuda(non_blocking=True)
                 outs = discriminator(data)
                 loss = cross_entropy(outs["score"], label.view(-1)) + discriminator.l2_loss()
                 d_optimizer.zero_grad()
