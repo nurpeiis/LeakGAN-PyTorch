@@ -211,7 +211,7 @@ def recurrent_func(f_type = "pre"):
                     result = result.contiguous()
             return results
         return func
-        
+
     elif f_type == "rollout":
         def func(model_dict, input_x, given_num, use_cuda=False, temperature=1.0):
             #Get G and D
@@ -230,7 +230,7 @@ def recurrent_func(f_type = "pre"):
             #Use input_x to perform G forward step
             while t < given_num +1:
                 #Extract f_t
-                if t == 0: 
+                if t == 0:
                     cur_sen = Variable(nn.init.constant_(torch.zeros(batch_size, seq_len), vocab_size)).long()
                     if use_cuda:
                         cur_sen = cur_sen.cuda(async=True)
@@ -306,7 +306,7 @@ def recurrent_func(f_type = "pre"):
                     )
                 f_t = discriminator(cur_sen)["feature"]
                 #G forward step
-                x_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, sub_goal, probs, t_ = generator(x_t, f_t, h_m_t, c_m_t, 
+                x_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, sub_goal, probs, t_ = generator(x_t, f_t, h_m_t, c_m_t,
                         h_w_t, c_w_t, last_goal,real_goal, t, temperature)
                 if t % step_size == 0:
                     if t > 0:
@@ -364,7 +364,7 @@ def rescale(rewards, delta=16.0):
             type: list
             length: seq_len / c, where c is c recent goals(steps into future)
             elements: np.array(size=batch_size)
-            R(reward matrix) = expit(delta * (0.5 - rank(i)/B)), where expit, is an activation function that re-projects the equidifferent scoring based on ranking to a more effective distribution. 
+            R(reward matrix) = expit(delta * (0.5 - rank(i)/B)), where expit, is an activation function that re-projects the equidifferent scoring based on ranking to a more effective distribution.
             In this model authors of the paper decided expit to be sigmoid function: expit = 1/(1+exp(-x))
     """
     r = np.array(rewards)
@@ -402,7 +402,7 @@ def one_hot(x, vocab_size, use_cuda=False):
 
     out = out.view(batch_size, seq_len, vocab_size)
     out = Variable(out)
-    
+
     if use_cuda:
         out = out.cuda(async=True)
     return out
@@ -451,7 +451,7 @@ def loss_func(f_type="pre_worker"):
                 size(batch_size * seq_len * vocab_size)
                 type(torch.FloatTensor)
             """
-            loss_func = nn.CrossEntropyLoss() 
+            loss_func = nn.CrossEntropyLoss()
             if use_cuda:
                 loss_func = loss_func.cuda()
             input_x = input_x.view(-1) #last dim

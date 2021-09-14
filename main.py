@@ -1,7 +1,7 @@
 import argparse
 import pickle as pkl
 import numpy as np
-import json 
+import json
 import glob
 import os #for checkpoint management
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -22,22 +22,22 @@ from target_lstm import TargetLSTM
 #Arguments
 parser = argparse.ArgumentParser(description="LeakGAN")
 parser.add_argument("--hpc", action="store_true", default=False)
-parser.add_argument("--data_path", type=str, default="/save_files/", metavar="PATH", 
+parser.add_argument("--data_path", type=str, default="/save_files/", metavar="PATH",
                     help="Data path to save files (default: /save_files/)")
 parser.add_argument("--rounds", type=int, default=150, metavar="N",
                     help="Rounds of adversarial training (default:150)")
 parser.add_argument("--g_pretrain_steps", type=int, default=120, metavar="N",
-                    help="Steps of pre-training generator (defaul: 120)")                    
+                    help="Steps of pre-training generator (defaul: 120)")
 parser.add_argument("--d_pretrain_steps", type=int, default=50, metavar="N",
-                    help="Steps of pre-training discriminator (defaul: 50)")    
-parser.add_argument("--g_steps", type=int, default=1, metavar="N", 
+                    help="Steps of pre-training discriminator (defaul: 50)")
+parser.add_argument("--g_steps", type=int, default=1, metavar="N",
                     help="Steps of generator updates in one round of adversarial training (defaul: 1)") #gen_train_num
 parser.add_argument("--d_steps", type=int, default=3, metavar="N",
-                    help="Steps of discriminator updates in one round of adversarial training (defaul: 3)")      
+                    help="Steps of discriminator updates in one round of adversarial training (defaul: 3)")
 parser.add_argument("--gk_epochs", type=int, default=1, metavar="N",
-                    help="Epochs of generator updates in one step of generate update (defaul: 1)")        
+                    help="Epochs of generator updates in one step of generate update (defaul: 1)")
 parser.add_argument("--dk_epochs", type=int, default=3, metavar="N",
-                    help="Epochs of discriminator updates in one step of generate update (defaul: 3)")  
+                    help="Epochs of discriminator updates in one step of generate update (defaul: 3)")
 parser.add_argument("--update_rate", type=float, default=0.8, metavar="UR",
                     help="Update rate of rollout model (defaul: 0.8)")
 parser.add_argument("--n_rollout", type=int, default=16, metavar="N",
@@ -53,7 +53,7 @@ parser.add_argument("--gen_lr", type=float, default=1e-3, metavar="LR",
 parser.add_argument("--dis_lr", type=float, default=1e-3, metavar="LR",
                     help="Learning Rate of discriminator optimizer (defaul: 1e-3)")
 parser.add_argument("--no_cuda", action="store_true", default=False,
-                    help="Disable CUDA training (defaul: False)")                                                                        
+                    help="Disable CUDA training (defaul: False)")
 parser.add_argument("--seed", type=int, default=1, metavar="S",
                     help="Random seed (defaul: 1)")
 
@@ -134,7 +134,7 @@ def prepare_model_dict(use_cuda=False):
     return model_dict
 
 #List of optimizers
-def prepare_optimizer_dict(model_dict, lr_dict): #lr_dict = learning rate 
+def prepare_optimizer_dict(model_dict, lr_dict): #lr_dict = learning rate
     generator = model_dict["generator"]
     discriminator = model_dict["discriminator"]
     worker = generator.worker
@@ -175,7 +175,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
     #get the optimizers
     m_optimizer = optimizer_dict["manager"]
     w_optimizer = optimizer_dict["worker"]
-    
+
     m_optimizer.zero_grad()
     w_optimizer.zero_grad()
 
@@ -184,7 +184,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
     """
      Perform pretrain step for real data
     """
-    
+
     for i, sample in enumerate(dataloader):
         #print("DataLoader: {}".format(dataloader))
         m_lr_scheduler.step()
@@ -193,7 +193,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
         sample = Variable(sample)
         if use_cuda:
             sample = sample.cuda(async=True)
-        
+
         # Calculate pretrain loss
         if (sample.size() == torch.zeros([64, 20]).size()): #sometimes smaller than 64 (16) is passed, so this if statement disables it
             #print("Sample size: {}".format(sample.size()))
@@ -207,7 +207,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
             clip_grad_norm_(manager.parameters(), max_norm=max_norm)
             m_optimizer.step()
             m_optimizer.zero_grad()
-            
+
             w_loss = loss_func("pre_worker")(sample, prediction, vocab_size, use_cuda)
             torch.autograd.grad(w_loss, worker.parameters())
             clip_grad_norm_(worker.parameters(), max_norm=max_norm)
@@ -258,7 +258,7 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
     cross_entropy = nn.CrossEntropyLoss() #this one is similar to NLL (negative log likelihood)
     if use_cuda:
         cross_entropy = cross_entropy.cuda()
-    
+
     for epoch in range(epochs):
         for i, sample in enumerate(dataloader):
             d_optimizer.zero_grad()
@@ -275,20 +275,20 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
             d_optimizer.step()
             if i == 63:
                 print("Pre-Discriminator loss: {:.5f}".format(loss))
-    
+
     model_dict["discriminator"] = discriminator
     optimizer_dict["discriminator"] = d_optimizer
     scheduler_dict["discriminator"] = d_lr_scheduler
     return model_dict, optimizer_dict, scheduler_dict
 
-#Adversarial training 
+#Adversarial training
 def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader_params,
                       vocab_size, pos_file, neg_file, batch_size, gen_train_num=1,
                       dis_train_epoch=5, dis_train_num=3, max_norm=5.0,
                       rollout_num=4, use_cuda=False, temperature=1.0, epoch=1, tot_epoch=100):
     """
         Get all the models, optimizer and schedulers
-    """                     
+    """
     generator = model_dict["generator"]
     discriminator = model_dict ["discriminator"]
     worker = generator.worker
@@ -334,7 +334,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         m_optimizer.step()
         w_optimizer.step()
         print("Adv-Manager loss: {:.5f} Adv-Worker loss: {:.5f}".format(m_loss, w_loss))
-    
+
     del adv_rets
     del real_goal
     del all_goal
@@ -356,11 +356,11 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
             cross_entropy = cross_entropy.cuda()
         """
         for d-steps do
-            Use current G, θm,θw to generate negative examples and combine with given positive examples S 
+            Use current G, θm,θw to generate negative examples and combine with given positive examples S
             Train discriminator Dφ for k epochs by Eq. (2)
         end for
         """
-        for _ in range(dis_train_num): 
+        for _ in range(dis_train_num):
             for i, sample in enumerate(dataloader):
                 data, label = sample["data"], sample["label"]
                 data = Variable(data)
@@ -446,7 +446,7 @@ def main():
     ckpt_num = 0
     save_checkpoint(model_dict, optimizer_dict, scheduler_dict, ckpt_num)
 
-    #Pretrain generator 
+    #Pretrain generator
     print ("#########################################################################")
     print ("Start Pretraining Generator...")
     real_data_params = param_dict["real_data_params"]
@@ -458,8 +458,8 @@ def main():
         model_dict, optimizer_dict, scheduler_dict = pretrain_generator(model_dict, optimizer_dict, scheduler_dict, r_dataloader, vocab_size=vocab_size, use_cuda=use_cuda, epoch=epoch, tot_epochs=range(param_dict["train_params"]["pre_gen_epoch_num"]))
     #Finish pretrain and save the checkpoint
     save_checkpoint(model_dict, optimizer_dict, scheduler_dict, ckpt_num)
-    
-    
+
+
     ckpt_num = 1
     #Adversarial train of D and G
     print ("#########################################################################")
