@@ -1,13 +1,13 @@
-import cPickle
+import pickle
 """
-this is the module that will be slightly different for me 
+this is the module that will be slightly different for me
 I will be using special bit block box that maps certain words into same bit block
 """
 data_Name = "cotra"
 vocab_file = "vocab_" + data_Name + ".pkl"
 
-word, vocab = cPickle.load(open('save/' + vocab_file))
-print (len(word))
+word, vocab = pickle.load(open('save/' + vocab_file, "rb"))
+print(len(word))
 input_file = "save/generator_sample.txt"
 output_file = "speech/" + data_Name + "_" + input_file.split('_')[-1]
 with open(output_file, 'w') as fout:

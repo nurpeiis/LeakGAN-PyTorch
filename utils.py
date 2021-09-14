@@ -18,7 +18,7 @@ def init_vars(generator, discriminator, use_cuda=False):
     vs = []
     if use_cuda:
         for var in variables_:
-            var = var.cuda(async=True)
+            var = var.cuda(non_blocking=True)
             vs.append(var)
     else:
         vs = variables_
@@ -74,7 +74,7 @@ def recurrent_func(f_type = "pre"):
                     cur_sen = cur_sen.contiguous()
                     cur_sen = F.pad(cur_sen.view(-1, t), (0, seq_len - t), value=vocab_size)
                 if use_cuda:
-                    cur_sen = cur_sen.cuda(async=True)
+                    cur_sen = cur_sen.cuda(non_blocking=True)
                 #print("Current sentence:{}".format(cur_sen))
                 #print("Current sentence size:{}".format(cur_sen.size()))
                 f_t= discriminator(cur_sen)["feature"]
@@ -91,7 +91,7 @@ def recurrent_func(f_type = "pre"):
                         real_goal = last_goal
                     last_goal = Variable(torch.zeros(batch_size, goal_out_size))
                     if use_cuda:
-                        last_goal = last_goal.cuda(async=True)
+                        last_goal = last_goal.cuda(non_blocking=True)
                     real_goal_list.append(real_goal)
                 """
                 Store needed information for calculating loss function
@@ -161,7 +161,7 @@ def recurrent_func(f_type = "pre"):
                     cur_sen = F.pad(cur_sen, (0, seq_len - t), value=vocab_size)
                 #Why no cuda here: CHECK: ADD CUDA!!!!
                 if use_cuda:
-                    cur_sen = cur_sen.cuda(async=True)
+                    cur_sen = cur_sen.cuda(non_blocking=True)
                 f_t = discriminator(cur_sen)["feature"]
                 #Generator forward step
                 x_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, sub_goal, probs, t_ = generator(x_t, f_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, t, temperature)
@@ -170,7 +170,7 @@ def recurrent_func(f_type = "pre"):
                         real_goal = last_goal
                     last_goal = Variable(torch.zeros(batch_size, goal_out_size))
                     if use_cuda:
-                        last_goal = last_goal.cuda(async=True)
+                        last_goal = last_goal.cuda(non_blocking=True)
                     real_goal_list.append(real_goal)
                 #Store info for calculating loss function
                 feature_list.append(f_t)
@@ -211,7 +211,7 @@ def recurrent_func(f_type = "pre"):
                     result = result.contiguous()
             return results
         return func
-        
+
     elif f_type == "rollout":
         def func(model_dict, input_x, given_num, use_cuda=False, temperature=1.0):
             #Get G and D
@@ -230,10 +230,10 @@ def recurrent_func(f_type = "pre"):
             #Use input_x to perform G forward step
             while t < given_num +1:
                 #Extract f_t
-                if t == 0: 
+                if t == 0:
                     cur_sen = Variable(nn.init.constant_(torch.zeros(batch_size, seq_len), vocab_size)).long()
                     if use_cuda:
-                        cur_sen = cur_sen.cuda(async=True)
+                        cur_sen = cur_sen.cuda(non_blocking=True)
                 else:
                     cur_sen = torch.stack(gen_token_list).permute(1,0)
                     cur_sen = F.pad(cur_sen, (0, seq_len - t), value=vocab_size)
@@ -246,7 +246,7 @@ def recurrent_func(f_type = "pre"):
                         real_goal = last_goal
                     last_goal = Variable(torch.zeros(batch_size, goal_out_size))
                     if use_cuda:
-                        last_goal = last_goal.cuda(async=True)
+                        last_goal = last_goal.cuda(non_blocking=True)
                 if t < given_num:
                     x_t = input_x[:, t].contiguous()
                     gen_token_list.append(x_t)
@@ -257,7 +257,7 @@ def recurrent_func(f_type = "pre"):
                 if len(gen_token_list) == 0:
                     cur_sen = Variable(nn.init.constant_(torch.zeros(batch_size, seq_len), vocab_size)).long()
                     if use_cuda:
-                        cur_sen = cur_sen.cuda(async=True)
+                        cur_sen = cur_sen.cuda(non_blocking=True)
                 else:
                     cur_sen = torch.stack(gen_token_list).permute(1,0)
                     cur_sen = F.pad(cur_sen, (0, seq_len - t + 1), value=vocab_size)
@@ -271,7 +271,7 @@ def recurrent_func(f_type = "pre"):
                     batch_size, goal_out_size
                 ))
                 if use_cuda:
-                    last_goal = last_goal.cuda(async=True)
+                    last_goal = last_goal.cuda(non_blocking=True)
                 gen_token_list.append(x_t)
                 t = t_
             gen_token = torch.stack(gen_token_list).permute(1, 0)
@@ -298,7 +298,7 @@ def recurrent_func(f_type = "pre"):
                         torch.zeros(batch_size, seq_len), vocab_size)
                     ).long()
                     if use_cuda:
-                        cur_sen = cur_sen.cuda(async=True)
+                        cur_sen = cur_sen.cuda(non_blocking=True)
                 else:
                     cur_sen = torch.stack(gen_token_list).permute(1, 0)
                     cur_sen = F.pad(
@@ -306,14 +306,14 @@ def recurrent_func(f_type = "pre"):
                     )
                 f_t = discriminator(cur_sen)["feature"]
                 #G forward step
-                x_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, sub_goal, probs, t_ = generator(x_t, f_t, h_m_t, c_m_t, 
+                x_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, sub_goal, probs, t_ = generator(x_t, f_t, h_m_t, c_m_t,
                         h_w_t, c_w_t, last_goal,real_goal, t, temperature)
                 if t % step_size == 0:
                     if t > 0:
                         real_goal = last_goal
                         last_goal = Variable(torch.zeros(batch_size, goal_out_size))
                     if use_cuda:
-                        last_goal = last_goal.cuda(async=True)
+                        last_goal = last_goal.cuda(non_blocking=True)
                 gen_token_list.append(x_t)
                 t = t_
             gen_token = torch.stack(gen_token_list).permute(1,0)
@@ -353,7 +353,7 @@ def get_rewards(model_dict, input_x, rollout_num, use_cuda=False, temperature=1.
             given_num += step_size
     rewards = rescale(rewards, delta) / rollout_num
     if use_cuda:
-        rewards = rewards.cuda(async=True)
+        rewards = rewards.cuda(non_blocking=True)
     discriminator = discriminator.train()
     return rewards
 def rescale(rewards, delta=16.0):
@@ -364,7 +364,7 @@ def rescale(rewards, delta=16.0):
             type: list
             length: seq_len / c, where c is c recent goals(steps into future)
             elements: np.array(size=batch_size)
-            R(reward matrix) = expit(delta * (0.5 - rank(i)/B)), where expit, is an activation function that re-projects the equidifferent scoring based on ranking to a more effective distribution. 
+            R(reward matrix) = expit(delta * (0.5 - rank(i)/B)), where expit, is an activation function that re-projects the equidifferent scoring based on ranking to a more effective distribution.
             In this model authors of the paper decided expit to be sigmoid function: expit = 1/(1+exp(-x))
     """
     r = np.array(rewards)
@@ -402,9 +402,9 @@ def one_hot(x, vocab_size, use_cuda=False):
 
     out = out.view(batch_size, seq_len, vocab_size)
     out = Variable(out)
-    
+
     if use_cuda:
-        out = out.cuda(async=True)
+        out = out.cuda(non_blocking=True)
     return out
 
 def loss_func(f_type="pre_worker"):
@@ -451,7 +451,7 @@ def loss_func(f_type="pre_worker"):
                 size(batch_size * seq_len * vocab_size)
                 type(torch.FloatTensor)
             """
-            loss_func = nn.CrossEntropyLoss() 
+            loss_func = nn.CrossEntropyLoss()
             if use_cuda:
                 loss_func = loss_func.cuda()
             input_x = input_x.view(-1) #last dim

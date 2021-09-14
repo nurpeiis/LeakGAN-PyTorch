@@ -1,12 +1,11 @@
 import nltk
 import random
-from scipy import stats
-import cPickle
+import pickle
 
 data_name = "cotra"
 vocab_file = "vocab_" + data_name + ".pkl"
 
-word, vocab = cPickle.load(open("save/" + vocab_file))
+word, vocab = pickle.load(open("save/" + vocab_file, "rb"))
 
 pad = vocab[' ']
 print(pad)
@@ -57,4 +56,5 @@ for ngram in range(2, 6):
     print("LeakGAN")
     print(len(weight), "-gram BLEU score: ", 1.0 * sum(bleu_leakgan)/len(bleu_leakgan)) # average
 
-cPickle.dump([hypothesis_list_leakgan], open("save/significance_test_sample.pkl", "w"))
+with open("save/significance_test_sample.pkl", "wb") as f:
+    pickle.dump([hypothesis_list_leakgan], f)
