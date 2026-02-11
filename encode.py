@@ -8,7 +8,6 @@ def text_to_tensor(filePath):
     """
     with open(filePath, 'r') as f:
         lines = f.readlines()
-    f.close()
     corpus = []
     for l in lines:
         l = l.strip().split(' ') #strip removes blank spaces from both sides
@@ -33,7 +32,7 @@ def text_to_tensor(filePath):
     corpus_num = []
     for p in corpus:
         corpus_num.append(list(map(lambda x: vocab.index(x) + 1, p)))
-    corpus_data = np.array(corpus_data)
+    corpus_data = np.array(corpus_num)
 
     """
     Save preprocessed file

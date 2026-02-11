@@ -93,7 +93,6 @@ d_l2_reg_lambda = 0.2
 def get_params(filePath):
     with open(filePath, 'r') as f:
         params = json.load(f)
-    f.close()
     return params
 
 def get_arguments():
@@ -429,7 +428,6 @@ def main():
         dis_data_params = json.load(f)
     if use_cuda:
         dis_data_params["pin_memory"] = True
-    f.close()
     pos_file = dis_data_params["positive_filepath"]
     neg_file = dis_data_params["negative_filepath"]
     batch_size = param_dict["train_params"]["generated_num"]
