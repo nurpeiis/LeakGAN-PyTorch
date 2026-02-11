@@ -217,7 +217,7 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
     Update model_dict, optimizer_dict, and scheduler_dict
     """
 
-    generator.woroker = worker
+    generator.worker = worker
     generator.manager = manager
     model_dict["generator"] = generator
 
@@ -381,7 +381,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
 
     scheduler_dict["manager"] = m_lr_scheduler
     scheduler_dict["worker"] = w_lr_scheduler
-    scheduler_dict["disciminator"] = d_lr_scheduler
+    scheduler_dict["discriminator"] = d_lr_scheduler
 
     return model_dict, optimizer_dict, scheduler_dict
 
