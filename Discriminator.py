@@ -22,8 +22,8 @@ class Highway(nn.Module):
         self.fc2 = nn.Linear(in_size, out_size)
     def forward(self, x):
         #highway = F.sigmoid(highway)*F.relu(highway) + (1. - transform)*pred # sets C = 1 - T
-        g = F.relu(self.fc1)
-        t = torch.sigmoid(self.fc2)
+        g = F.relu(self.fc1(x))
+        t = torch.sigmoid(self.fc2(x))
         out = g*t + (1. - t)*x
         return out
 class Discriminator(nn.Module):
