@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
-from torch.autograd import Variable
 from torch.nn.utils import clip_grad_norm_
 
 from data_iter import real_data_loader, dis_data_loader
@@ -190,9 +189,8 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
         m_lr_scheduler.step()
         w_lr_scheduler.step()
 
-        sample = Variable(sample)
         if use_cuda:
-            sample = sample.cuda(async=True)
+            sample = sample.cuda()
         
         # Calculate pretrain loss
         if (sample.size() == torch.zeros([64, 20]).size()): #sometimes smaller than 64 (16) is passed, so this if statement disables it
@@ -263,8 +261,6 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
         for i, sample in enumerate(dataloader):
             d_optimizer.zero_grad()
             data, label = sample["data"], sample["label"] #initialize sample variables
-            data = Variable(data)
-            label = Variable(label)
             if use_cuda:
                 data = data.cuda()
                 label = label.cuda()
@@ -363,11 +359,9 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         for _ in range(dis_train_num): 
             for i, sample in enumerate(dataloader):
                 data, label = sample["data"], sample["label"]
-                data = Variable(data)
-                label = Variable(label)
                 if use_cuda:
-                    data = data.cuda(async=True)
-                    label = label.cuda(async=True)
+                    data = data.cuda()
+                    label = label.cuda()
                 outs = discriminator(data)
                 loss = cross_entropy(outs["score"], label.view(-1)) + discriminator.l2_loss()
                 d_optimizer.zero_grad()

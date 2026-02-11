@@ -2,7 +2,6 @@ from scipy.stats import truncnorm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 from torch.distributions import Categorical
 
 #A truncated distribution has its domain (the x-values) restricted to a certain range of values. For example, you might restrict your x-values to between 0 and 100, written in math terminology as {0 > x > 100}. There are several types of truncated distributions:
@@ -90,8 +89,8 @@ class Generator(nn.Module):
         self.manager = Manager(**manager_params)
 
     def init_hidden(self):
-        h = Variable(torch.zeros(self.worker.batch_size, self.worker.hidden_dim))
-        c = Variable(torch.zeros(self.worker.batch_size, self.worker.hidden_dim))
+        h = torch.zeros(self.worker.batch_size, self.worker.hidden_dim)
+        c = torch.zeros(self.worker.batch_size, self.worker.hidden_dim)
         return h, c
 
     def forward(self, x_t, f_t, h_m_t, c_m_t, h_w_t, c_w_t, last_goal, real_goal, t, temperature):
