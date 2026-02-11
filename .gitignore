@@ -1,3 +1,30 @@
+# IDE
 .vscode
+.idea
+
+# Python
 __pycache__
+*.pyc
+*.pyo
+*.egg-info
+dist/
+build/
+*.egg
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Data files
+*.npy
+*.pkl
+
+# Checkpoints
+*.pth
+*.pth.tar
+checkpoint*
+
+# Environment
+.env
+venv/
+.venv/
