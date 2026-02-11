@@ -201,13 +201,13 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
             delta_feature = pre_rets["delta_feature"]
 
             m_loss = loss_func("pre_manager")(real_goal, delta_feature)
-            torch.autograd.grad(m_loss, manager.parameters())
+            m_loss.backward()
             clip_grad_norm_(manager.parameters(), max_norm=max_norm)
             m_optimizer.step()
             m_optimizer.zero_grad()
-            
+
             w_loss = loss_func("pre_worker")(sample, prediction, vocab_size, use_cuda)
-            torch.autograd.grad(w_loss, worker.parameters())
+            w_loss.backward()
             clip_grad_norm_(worker.parameters(), max_norm=max_norm)
             w_optimizer.step()
             w_optimizer.zero_grad()
@@ -323,8 +323,8 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         m_loss = loss_func("adv_manager")(rewards, real_goal, delta_feature)
         w_loss = loss_func("adv_worker")(all_goal, delta_feature_for_worker, gen_token, prediction, vocab_size, use_cuda)
 
-        torch.autograd.grad(m_loss, manager.parameters()) #based on loss improve the parameters
-        torch.autograd.grad(w_loss, worker.parameters())
+        m_loss.backward(retain_graph=True)
+        w_loss.backward()
         clip_grad_norm_(manager.parameters(), max_norm)
         clip_grad_norm_(worker.parameters(), max_norm)
         m_optimizer.step()
