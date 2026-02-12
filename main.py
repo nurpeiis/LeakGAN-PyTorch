@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.backends.cudnn as cudnn
-from torch.autograd import Variable
 from torch.nn.utils import clip_grad_norm_
 
 from data_iter import real_data_loader, dis_data_loader
@@ -94,7 +93,6 @@ d_l2_reg_lambda = 0.2
 def get_params(filePath):
     with open(filePath, 'r') as f:
         params = json.load(f)
-    f.close()
     return params
 
 def get_arguments():
@@ -186,40 +184,36 @@ def pretrain_generator(model_dict, optimizer_dict, scheduler_dict, dataloader, v
     """
     
     for i, sample in enumerate(dataloader):
-        #print("DataLoader: {}".format(dataloader))
-        m_lr_scheduler.step()
-        w_lr_scheduler.step()
-
-        sample = Variable(sample)
         if use_cuda:
-            sample = sample.cuda(async=True)
-        
+            sample = sample.cuda()
+
         # Calculate pretrain loss
         if (sample.size() == torch.zeros([64, 20]).size()): #sometimes smaller than 64 (16) is passed, so this if statement disables it
-            #print("Sample size: {}".format(sample.size()))
             pre_rets = recurrent_func("pre")(model_dict, sample, use_cuda)
             real_goal = pre_rets["real_goal"]
             prediction = pre_rets["prediction"]
             delta_feature = pre_rets["delta_feature"]
 
             m_loss = loss_func("pre_manager")(real_goal, delta_feature)
-            torch.autograd.grad(m_loss, manager.parameters())
+            m_loss.backward()
             clip_grad_norm_(manager.parameters(), max_norm=max_norm)
             m_optimizer.step()
             m_optimizer.zero_grad()
-            
+            m_lr_scheduler.step()
+
             w_loss = loss_func("pre_worker")(sample, prediction, vocab_size, use_cuda)
-            torch.autograd.grad(w_loss, worker.parameters())
+            w_loss.backward()
             clip_grad_norm_(worker.parameters(), max_norm=max_norm)
             w_optimizer.step()
             w_optimizer.zero_grad()
+            w_lr_scheduler.step()
             if i == 63:
                 print("Pre-Manager Loss: {:.5f}, Pre-Worker Loss: {:.5f}\n".format(m_loss, w_loss))
     """
     Update model_dict, optimizer_dict, and scheduler_dict
     """
 
-    generator.woroker = worker
+    generator.worker = worker
     generator.manager = manager
     model_dict["generator"] = generator
 
@@ -263,16 +257,14 @@ def pretrain_discriminator(model_dict, optimizer_dict, scheduler_dict,
         for i, sample in enumerate(dataloader):
             d_optimizer.zero_grad()
             data, label = sample["data"], sample["label"] #initialize sample variables
-            data = Variable(data)
-            label = Variable(label)
             if use_cuda:
                 data = data.cuda()
                 label = label.cuda()
             outs = discriminator(data)
             loss = cross_entropy(outs["score"], label.view(-1)) + discriminator.l2_loss()
-            d_lr_scheduler.step()
             loss.backward()
             d_optimizer.step()
+            d_lr_scheduler.step()
             if i == 63:
                 print("Pre-Discriminator loss: {:.5f}".format(loss))
     
@@ -308,9 +300,6 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
 
     #Adversarial training for generator
     for _ in range(gen_train_num):
-        m_lr_scheduler.step()
-        w_lr_scheduler.step()
-
         m_optimizer.zero_grad()
         w_optimizer.zero_grad()
 
@@ -327,12 +316,14 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         m_loss = loss_func("adv_manager")(rewards, real_goal, delta_feature)
         w_loss = loss_func("adv_worker")(all_goal, delta_feature_for_worker, gen_token, prediction, vocab_size, use_cuda)
 
-        torch.autograd.grad(m_loss, manager.parameters()) #based on loss improve the parameters
-        torch.autograd.grad(w_loss, worker.parameters())
+        m_loss.backward(retain_graph=True)
+        w_loss.backward()
         clip_grad_norm_(manager.parameters(), max_norm)
         clip_grad_norm_(worker.parameters(), max_norm)
         m_optimizer.step()
         w_optimizer.step()
+        m_lr_scheduler.step()
+        w_lr_scheduler.step()
         print("Adv-Manager loss: {:.5f} Adv-Worker loss: {:.5f}".format(m_loss, w_loss))
     
     del adv_rets
@@ -363,17 +354,15 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
         for _ in range(dis_train_num): 
             for i, sample in enumerate(dataloader):
                 data, label = sample["data"], sample["label"]
-                data = Variable(data)
-                label = Variable(label)
                 if use_cuda:
-                    data = data.cuda(async=True)
-                    label = label.cuda(async=True)
+                    data = data.cuda()
+                    label = label.cuda()
                 outs = discriminator(data)
                 loss = cross_entropy(outs["score"], label.view(-1)) + discriminator.l2_loss()
                 d_optimizer.zero_grad()
-                d_lr_scheduler.step()
                 loss.backward()
                 d_optimizer.step()
+                d_lr_scheduler.step()
         print("{}/{} Adv-Discriminator Loss: {:.5f}".format(n, range(dis_train_epoch),loss))
     #Save all changes
     model_dict["discriminator"] = discriminator
@@ -387,7 +376,7 @@ def adversarial_train(model_dict, optimizer_dict, scheduler_dict, dis_dataloader
 
     scheduler_dict["manager"] = m_lr_scheduler
     scheduler_dict["worker"] = w_lr_scheduler
-    scheduler_dict["disciminator"] = d_lr_scheduler
+    scheduler_dict["discriminator"] = d_lr_scheduler
 
     return model_dict, optimizer_dict, scheduler_dict
 
@@ -402,7 +391,7 @@ def save_checkpoint(model_dict, optimizer_dict, scheduler_dict, ckpt_num, replac
         os.remove(oldest_ckpt)
 
 def restore_checkpoint(ckpt_path):
-    checkpoint = torch.load(ckpt_path)
+    checkpoint = torch.load(ckpt_path, weights_only=False)
     return checkpoint
 
 def main():
@@ -435,7 +424,6 @@ def main():
         dis_data_params = json.load(f)
     if use_cuda:
         dis_data_params["pin_memory"] = True
-    f.close()
     pos_file = dis_data_params["positive_filepath"]
     neg_file = dis_data_params["negative_filepath"]
     batch_size = param_dict["train_params"]["generated_num"]
